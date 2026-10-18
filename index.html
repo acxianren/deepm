@@ -186,12 +186,12 @@ function render(state) {
     const b1 = document.createElement("button");
     b1.className = "mini primary";
     b1.textContent = "立即播放";
-    b1.onclick = () => send("play_now", { url: item.url, title: item.title });
+    b1.onclick = () => send("play_now", { uid: item.uid, url: item.url, title: item.title });
 
     const b2 = document.createElement("button");
     b2.className = "mini";
     b2.textContent = "下一首";
-    b2.onclick = () => send("play_next", { url: item.url, title: item.title });
+    b2.onclick = () => send("play_next", { uid: item.uid, url: item.url, title: item.title });
 
     acts.append(b1, b2);
     li.append(idx, t, acts);
