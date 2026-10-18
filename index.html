@@ -158,7 +158,8 @@ async function send(action, extra = {}, refreshDelay = 800) {
 }
 
 function render(state) {
-  const online = state && state.updated && (Date.now() / 1000 - state.updated < 360);
+  // 由機器人推送的 online 決定（開機推 true、關機推 false）
+  const online = !!(state && state.online);
   $("dot").className = "dot " + (online ? "on" : "off");
   $("statusText").textContent = online ? "線上" : "離線";
 
