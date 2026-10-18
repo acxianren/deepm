@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deepmusic · 播放控制台</title>
+<style>
+  :root{
+    --bg:#0e1218; --card:#161d27; --card2:#1b2431; --line:#243040;
+    --text:#e8eef7; --muted:#8fa3ba; --blue:#5b9dff; --blue-d:#3f6fb5;
+    --green:#3ddc84; --red:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:24px 16px 64px;
+    background:radial-gradient(1200px 600px at 50% -10%, #1a2740 0%, var(--bg) 55%);
+    color:var(--text); font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .logo{width:44px;height:44px;border-radius:12px;background:var(--blue-d);
+        display:grid;place-items:center;font-size:22px}
+  h1{font-size:22px;margin:0;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:12px;margin-top:2px}
+  .status{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#4a5a70}
+  .dot.on{background:var(--green);box-shadow:0 0 10px var(--green)}
+  .dot.off{background:var(--red)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
+  .label{font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+  .now-title{font-size:19px;font-weight:700;line-height:1.45;word-break:break-word}
+  .now-sub{color:var(--muted);font-size:12px;margin-top:6px;word-break:break-all}
+  .bar{height:4px;border-radius:2px;background:var(--card2);overflow:hidden;margin-top:14px}
+  .bar > i{display:block;height:100%;width:30%;
+    background:linear-gradient(90deg,var(--blue-d),var(--blue));
+    animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+  button{
+    font-family:inherit;font-size:13px;color:var(--text);background:var(--card2);
+    border:1px solid var(--line);border-radius:10px;padding:9px 14px;cursor:pointer;
+    transition:.15s;
+  }
+  button:hover{border-color:var(--blue);color:#fff}
+  button:active{transform:scale(.97)}
+  button.primary{background:var(--blue-d);border-color:var(--blue-d);color:#fff}
+  button.primary:hover{background:var(--blue)}
+  button.danger:hover{border-color:var(--red);color:var(--red)}
+  button.mini{padding:6px 10px;font-size:12px;border-radius:8px}
+  .row{display:flex;gap:8px}
+  input[type=url]{
+    flex:1;min-width:0;font-family:inherit;font-size:13px;color:var(--text);
+    background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  }
+  input[type=url]:focus{outline:none;border-color:var(--blue)}
+  ul{list-style:none;margin:0;padding:0}
+  li{
+    display:flex;align-items:center;gap:10px;padding:10px 0;
+    border-bottom:1px solid var(--line);
+  }
+  li:last-child{border-bottom:none}
+  .idx{width:22px;color:var(--muted);font-size:12px;text-align:right;flex:none}
+  .t{flex:1;min-width:0;font-size:14px;line-height:1.4;word-break:break-word}
+  .acts{display:flex;gap:6px;flex:none}
+  .empty{color:var(--muted);font-size:13px;padding:8px 0}
+  footer{text-align:center;color:#4a5a70;font-size:11px;margin-top:28px}
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(120%);
+    background:#1f2a3a;border:1px solid var(--line);color:var(--text);
+    padding:10px 18px;border-radius:12px;font-size:13px;transition:.25s;pointer-events:none;
+    max-width:90vw;text-align:center;
+  }
+  #toast.show{transform:translateX(-50%) translateY(0)}
+  @media (max-width:480px){
+    .idx{display:none}
+    .now-title{font-size:17px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🎵</div>
+    <div>
+      <h1>Deepmusic</h1>
+      <div class="sub">播放控制台</div>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">連線中…</span></div>
+  </header>
+
+  <div class="card">
+    <div class="label">正在播放</div>
+    <div class="now-title" id="nowTitle">—</div>
+    <div class="now-sub" id="nowUrl"></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="controls">
+      <button id="btnPause" class="primary">暫停</button>
+      <button id="btnSkip">跳過</button>
+      <button id="btnStop" class="danger">停止並清空</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">加入歌曲</div>
+    <div class="row">
+      <input type="url" id="urlInput" placeholder="貼上 YouTube / Bilibili 影片或歌單連結">
+      <button id="btnAdd" class="primary">加入</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">佇列 <span id="queueCount" style="color:var(--muted)"></span></div>
+    <ul id="queue"><li class="empty">佇列是空的</li></ul>
+  </div>
+
+  <footer>由我和小鯨魚一起做的小東西</footer>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ======= 這裡要改 ======= */
+const WORKER_URL = "https://deepmusic-bridge.alexchan281102.workers.dev";   // 結尾不要加斜線
+const PAGE_KEY   = "762y0d7w15uvamnniatf1pudj1xuyp";                      // 跟 Worker 裡的 PAGE_KEY 一致
+/* ======================= */
+
+const $ = (id) => document.getElementById(id);
+let paused = false;
+
+function toast(msg) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+async function send(action, extra = {}) {
+  try {
+    const res = await fetch(WORKER_URL + "/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, key: PAGE_KEY, ...extra }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    toast("已送出");
+    setTimeout(refresh, 800);
+  } catch (e) {
+    toast("送出失敗：" + e.message);
+  }
+}
+
+function render(state) {
+  const online = state && state.updated && (Date.now() / 1000 - state.updated < 75);
+  $("dot").className = "dot " + (online ? "on" : "off");
+  $("statusText").textContent = online ? "線上" : "離線";
+
+  const now = state && state.now ? state.now : null;
+  $("nowTitle").textContent = now && now.title ? now.title : "目前沒有在播放";
+  $("nowUrl").textContent = now && now.url ? now.url : "";
+  $("bar").style.animationPlayState = state && state.playing ? "running" : "paused";
+
+  paused = !!(state && state.paused);
+  $("btnPause").textContent = paused ? "繼續" : "暫停";
+
+  const queue = (state && state.queue) || [];
+  $("queueCount").textContent = queue.length ? `（${queue.length} 首）` : "";
+  const ul = $("queue");
+  ul.innerHTML = "";
+  if (!queue.length) {
+    ul.innerHTML = '<li class="empty">佇列是空的</li>';
+    return;
+  }
+  queue.forEach((item, i) => {
+    const li = document.createElement("li");
+    const idx = document.createElement("span");
+    idx.className = "idx";
+    idx.textContent = i + 1;
+    const t = document.createElement("span");
+    t.className = "t";
+    t.textContent = item.title || item.url;
+    const acts = document.createElement("span");
+    acts.className = "acts";
+
+    const b1 = document.createElement("button");
+    b1.className = "mini primary";
+    b1.textContent = "立即播放";
+    b1.onclick = () => send("play_now", { url: item.url, title: item.title });
+
+    const b2 = document.createElement("button");
+    b2.className = "mini";
+    b2.textContent = "下一首";
+    b2.onclick = () => send("play_next", { url: item.url, title: item.title });
+
+    acts.append(b1, b2);
+    li.append(idx, t, acts);
+    ul.appendChild(li);
+  });
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(WORKER_URL + "/state", { cache: "no-store" });
+    const state = await res.json();
+    render(state);
+  } catch (e) {
+    $("dot").className = "dot off";
+    $("statusText").textContent = "連不上";
+  }
+}
+
+$("btnPause").onclick = () => send(paused ? "resume" : "pause");
+$("btnSkip").onclick = () => send("skip");
+$("btnStop").onclick = () => {
+  if (confirm("停止播放並清空整個佇列？")) send("stop");
+};
+$("btnAdd").onclick = () => {
+  const v = $("urlInput").value.trim();
+  if (!v) return toast("先貼一個連結");
+  send("play", { url: v });
+  $("urlInput").value = "";
+};
+$("urlInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("btnAdd").click();
+});
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
