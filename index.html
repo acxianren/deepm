@@ -57,9 +57,12 @@
   ul{list-style:none;margin:0;padding:0}
   li{
     display:flex;align-items:center;gap:10px;padding:10px 0;
-    border-bottom:1px solid var(--line);
+    border-bottom:1px solid var(--line);cursor:grab;transition:background .12s;
   }
   li:last-child{border-bottom:none}
+  li.dragging{opacity:.35}
+  li.over{background:rgba(91,157,255,.12);box-shadow:inset 3px 0 0 var(--blue)}
+  .grip{color:#3f4f66;font-size:14px;flex:none;user-select:none;letter-spacing:-2px}
   .idx{width:22px;color:var(--muted);font-size:12px;text-align:right;flex:none}
   .t{flex:1;min-width:0;font-size:14px;line-height:1.4;word-break:break-word}
   .acts{display:flex;gap:6px;flex:none}
@@ -110,7 +113,9 @@
   </div>
 
   <div class="card">
-    <div class="label">佇列 <span id="queueCount" style="color:var(--muted)"></span></div>
+    <div class="label">佇列 <span id="queueCount" style="color:var(--muted)"></span>
+      <span style="color:#4a5a70;letter-spacing:0;text-transform:none;font-weight:400">· 拖曳可調整順序</span>
+    </div>
     <ul id="queue"><li class="empty">佇列是空的</li></ul>
   </div>
 
@@ -127,6 +132,7 @@ const PAGE_KEY   = "762y0d7w15uvamnniatf1pudj1xuyp";                      // 跟
 
 const $ = (id) => document.getElementById(id);
 let paused = false;
+let dragUid = null;
 
 function toast(msg) {
   const el = $("toast");
@@ -136,7 +142,7 @@ function toast(msg) {
   el._t = setTimeout(() => el.classList.remove("show"), 2200);
 }
 
-async function send(action, extra = {}) {
+async function send(action, extra = {}, refreshDelay = 800) {
   try {
     const res = await fetch(WORKER_URL + "/command", {
       method: "POST",
@@ -145,7 +151,7 @@ async function send(action, extra = {}) {
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     toast("已送出");
-    setTimeout(refresh, 800);
+    setTimeout(refresh, refreshDelay);
   } catch (e) {
     toast("送出失敗：" + e.message);
   }
@@ -174,6 +180,13 @@ function render(state) {
   }
   queue.forEach((item, i) => {
     const li = document.createElement("li");
+    li.draggable = true;
+    li.dataset.uid = item.uid;
+
+    const handle = document.createElement("span");
+    handle.className = "grip";
+    handle.textContent = "⠿";
+
     const idx = document.createElement("span");
     idx.className = "idx";
     idx.textContent = i + 1;
@@ -193,8 +206,42 @@ function render(state) {
     b2.textContent = "下一首";
     b2.onclick = () => send("play_next", { uid: item.uid, url: item.url, title: item.title });
 
+    // ---- 拖曳排序 ----
+    li.addEventListener("dragstart", (e) => {
+      dragUid = item.uid;
+      li.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(item.uid));
+    });
+    li.addEventListener("dragend", () => {
+      dragUid = null;
+      li.classList.remove("dragging");
+      document.querySelectorAll("#queue li.over").forEach((n) => n.classList.remove("over"));
+    });
+    li.addEventListener("dragover", (e) => {
+      if (dragUid == null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      li.classList.add("over");
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("over"));
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      li.classList.remove("over");
+      if (dragUid == null || dragUid === item.uid) return;
+      const from = queue.findIndex((x) => x.uid === dragUid);
+      const to = i;
+      if (from === -1 || from === to) return;
+      send("move", { uid: dragUid, to }, 4200);
+      // 立刻先在畫面上換位，不用等伺服器
+      const arr = queue.slice();
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      render({ ...state, queue: arr });
+    });
+
     acts.append(b1, b2);
-    li.append(idx, t, acts);
+    li.append(handle, idx, t, acts);
     ul.appendChild(li);
   });
 }
