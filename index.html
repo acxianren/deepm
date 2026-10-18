@@ -158,7 +158,7 @@ async function send(action, extra = {}, refreshDelay = 800) {
 }
 
 function render(state) {
-  const online = state && state.updated && (Date.now() / 1000 - state.updated < 75);
+  const online = state && state.updated && (Date.now() / 1000 - state.updated < 360);
   $("dot").className = "dot " + (online ? "on" : "off");
   $("statusText").textContent = online ? "線上" : "離線";
 
@@ -272,8 +272,15 @@ $("urlInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") $("btnAdd").click();
 });
 
-refresh();
-setInterval(refresh, 3000);
+// 輪詢：頁面在前景 5 秒一次，切到背景就降到 30 秒（省 KV 讀取額度）
+async function loop() {
+  await refresh();
+  setTimeout(loop, document.hidden ? 30000 : 5000);
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refresh();
+});
+loop();
 </script>
 </body>
 </html>
